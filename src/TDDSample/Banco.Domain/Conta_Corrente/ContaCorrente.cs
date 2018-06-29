@@ -1,5 +1,6 @@
 ﻿
 using Banco.Domain.Conta_Corrente.ValueObjects;
+using System.Collections.Generic;
 
 namespace Banco.Domain.Conta_Corrente
 {
@@ -8,12 +9,14 @@ namespace Banco.Domain.Conta_Corrente
         private decimal Saldo { get; set; }
         private decimal SaldoBloqueado { get; set; }
         private decimal SaldoDisponivel { get; set; }
+        public ValidationResult ValidationResult { get; private set; }
 
         public ContaCorrente(decimal _saldo, decimal _saldoBloqueado, decimal _saldoDisponivel)
         {
             Saldo = _saldo;
             SaldoBloqueado = _saldoBloqueado;
             SaldoDisponivel = _saldoDisponivel;
+            ValidationResult = new ValidationResult();
         }
 
         public ContaCorrente()
@@ -34,10 +37,9 @@ namespace Banco.Domain.Conta_Corrente
 
         public RetornoTransacao Depositar(decimal valor)
         {
-            var retornoTransacao = ValidarValorTransacao(valor);
-            if (retornoTransacao.Retorno != TipoRetorno.Sucesso)
+            if (!ValidarTransacao(valor, TipoTransacao.Deposito))
             {
-                return retornoTransacao;
+                return new RetornoTransacao("Não foi possível efetuar o depósito.", TipoRetorno.Erro);
             }
 
             Saldo += valor;
@@ -61,19 +63,36 @@ namespace Banco.Domain.Conta_Corrente
 
         public RetornoTransacao Sacar(decimal valor)
         {
-            var retornoTransacao = ValidarValorTransacao(valor);
-            if (retornoTransacao.Retorno != TipoRetorno.Sucesso)
+            if (!ValidarTransacao(valor, TipoTransacao.Saque))
             {
-                return retornoTransacao;
-            }
-
-            if (ObterSaldoDisponivel() < valor)
-            {
-                return new RetornoTransacao("Não é possível sacar um valor superior aos fundos.", TipoRetorno.Erro);
+                return new RetornoTransacao("Não foi possível efetuar o saque.", TipoRetorno.Erro);
             }
 
             Saldo -= valor;
             return new RetornoTransacao("Saque efetuado com sucesso.", TipoRetorno.Sucesso);
+        }
+
+        private bool ValidarTransacao(decimal valor, TipoTransacao tipoTransacao)
+        {
+            if (valor == 0)
+            {
+                ValidationResult.AdicionarErro("Valor 0", "Não é possível realizar transações de valores igual a 0.");
+            }
+
+            if (valor < 0)
+            {
+                ValidationResult.AdicionarErro("Valor negativo","Não é possível realizar transações de valores negativos.");
+            }
+
+            if (tipoTransacao == TipoTransacao.Saque)
+            {
+                if (ObterSaldoDisponivel() < valor)
+                {
+                    ValidationResult.AdicionarErro("Saldo insuficiente", "Não é possível sacar um valor superior aos fundos.");
+                }
+            }
+
+            return ValidationResult.IsValid();
         }
     }
 }
